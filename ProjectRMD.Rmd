@@ -1,0 +1,84 @@
+---
+title: "Practical Machine Learning Project"
+author: "Anik"
+date: "Saturday, January 24, 2015"
+output: html_document
+---
+
+##Cleaning The Data
+
+```{r}
+library(caret)
+library(randomForest)
+
+training <- read.csv("C:/Users/Anik/Documents/pml-training.csv")
+testing <- read.csv("C:/Users/Anik/Documents/pml-testing.csv")
+
+training$classe <- factor(training$classe)
+
+nonNAs <- colSums(!is.na(training))
+
+#the keep variable stores which cols have at least 1 NA value
+keep <- c()
+for (cnt in 1:ncol(training)) {
+  if (nonNAs[cnt] == nrow(training)) {
+    keep <- c(keep, names(training[cnt]))
+  }
+}
+
+#removes the bad cols found above
+training <- training[,(names(training) %in% keep)]
+training <- training[,8:ncol(training)]
+
+#gets rid of variables with close to zero variance, since they add nothing to the model
+nsv <- nearZeroVar(training, saveMetrics = T)
+training <- training[, !nsv$nzv]
+
+keep <- names(training)
+
+#this makes sure that the testing data has the same columns as the same as training
+testing <- testing[,(names(testing) %in% keep)]
+
+
+```
+
+After taking a quick glance of the data on Excel we see that there are lots of unnessesary data. After cleaning the data by removing columns with NA values or minimal variance, we are left with 52 columns (started with 160). 
+
+
+##Growing the Forest
+
+Although we do have testing data, we don't know the correct outcomes. On top of this it's far too small, only 20 observation points. This is why we split our original training data into two parts. The new "trainer" group will be a 75% of the original observation points, randomly selected. This will be used to create a random forest model. And we will test this model on the "tester" group; the remaining 25% of the original data.
+
+Random forest is definitely the way to go because our outcomes are factors. Linear regressions would be more apporiate if the outcomes were continuous. Like stock price.
+
+
+```{r}
+#splitting the data and running the machine learning algo
+set.seed(123)
+inTrain <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+trainer <- training[inTrain,]
+tester <- training[-inTrain,]
+
+#runs very well, the error rate is only 0.54%
+modFit <- randomForest(x=trainer[,1:52], y=trainer$classe)
+modFit
+
+#there are only 24 errors from 4904 data points. Runs well.
+predicted <- predict(modFit, tester)
+table(tester$classe, predicted)
+```
+
+The model performs very well on both groups. The expected sample error is 26.4 errors which is 4904*0.54% and the number of errors we got was 24. Which is suprising since the errors usually increase on the testing data! 
+
+The seed is 123 and this test is 100% reproducible. 
+
+#Results
+```{r}
+
+#all 20/20 were correct
+results <- predict(modFit, testing)
+results
+
+```
+
+Our model worked perfectly on the original testing data! 
